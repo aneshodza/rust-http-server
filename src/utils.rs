@@ -18,3 +18,13 @@ pub fn greet_user() {
 
     "#);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_greet_user_throws_no_errors() {
+        greet_user()
+    }
+}
