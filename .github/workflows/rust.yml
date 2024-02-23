@@ -4,6 +4,7 @@ on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
+  TCP_ADDRESS: "127.0.0.1:7878"
 
 jobs:
   build:
