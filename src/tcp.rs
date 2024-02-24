@@ -22,14 +22,14 @@ const RECONNECT_TRIES: u8 = 5;
 ///
 /// In case the function fails to bind to port 7878 five times it panics and also prints out the
 /// reason for not being able to.
-fn internal_spawn_tcp_server(tries: u8) -> TcpListener {
-    match TcpListener::bind(TCP_ADDRESS) {
+fn internal_spawn_tcp_server(tries: u8, tcp_address: &str) -> TcpListener {
+    match TcpListener::bind(tcp_address) {
         Ok(listener) => listener,
         Err(e) if tries < RECONNECT_TRIES => {
-            eprintln!("Failed to bind to port 7878. Reason: {}", e);
+            eprintln!("Failed to bind to port. Reason: {}", e);
             println!("Trying {} more times", RECONNECT_TRIES - tries);
             thread::sleep(Duration::from_secs(5));
-            internal_spawn_tcp_server(tries + 1)
+            internal_spawn_tcp_server(tries + 1, tcp_address)
         },
         Err(e) => {
             panic!("Couldn't bind to port! Reason: {}", e);
@@ -50,7 +50,7 @@ fn internal_spawn_tcp_server(tries: u8) -> TcpListener {
 /// In case the function fails to bind to port 7878 five times it panics and also prints out the
 /// reason for not being able to.
 pub fn spawn_tcp_server() -> TcpListener {
-    internal_spawn_tcp_server(0)
+    internal_spawn_tcp_server(0, "127.0.0.1:7878")
 }
 
 #[cfg(test)]
@@ -67,10 +67,12 @@ mod tests {
     fn test_panic_return() {
         // This purposefully occupies the port our server wants to connect to, so when we spawn the
         // server it fails.
-        let _guard = std::net::TcpListener::bind(TCP_ADDRESS).expect("Failed to bind the initial listener");
+        let _guard = std::net::TcpListener::bind("127.0.0.1:0").expect("Failed to bind the initial listener");
+
+        let _port = _guard.local_addr().expect("Failed to get the local address").port();
 
         let result = std::panic::catch_unwind(|| {
-            internal_spawn_tcp_server(4)
+            internal_spawn_tcp_server(5, ("127.0.0.1:".to_owned() + &_port.to_string()).as_str());
         });
 
         assert!(result.is_err(), "The binding should have paniced, as it cannot bind to the port but it didn't");
