@@ -2,7 +2,6 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::Duration;
 
-const TCP_ADDRESS: &str = "127.0.0.1:7878";
 const RECONNECT_TRIES: u8 = 5;
 
 /// Attempts to spawn a TCP-Server to port 7878. It retries 5 times, after which the function
@@ -113,7 +112,7 @@ mod tests {
 
         let mut stream = TcpStream::connect(("127.0.0.1:".to_owned() + &port.to_string()).as_str()).expect("Failed to create tcp client");
         let request = "Hello, server!";
-        stream.write_all(request.as_bytes());
+        let _ = stream.write_all(request.as_bytes());
         thread::sleep(Duration::from_secs(5));
         match rx.recv_timeout(Duration::from_secs(5)) {
             Ok(_) => println!("Test succeeded, connection was established and handled."),
