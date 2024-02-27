@@ -1,4 +1,4 @@
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::Duration;
 
@@ -53,13 +53,33 @@ pub fn spawn_tcp_server() -> TcpListener {
     internal_spawn_tcp_server(0, "127.0.0.1:7878")
 }
 
+/// This function handles the traffic that comes into the TcpServer and spawns a new thread for
+/// every incoming connection.
+///
+/// # Parameters
+///
+/// - `listener`: This is a `TcpListener` object. Ideally this is spawned from the
+/// `spawn_tcp_server()` function.
+///
+/// - `resolved`: This is the function that handles the actual business logic of every incoming
+/// connection. The functions parameters should be a simple `TcpStream` object.
+pub fn handle_incoming_connections(listener: TcpListener, responder: &dyn Fn(TcpStream)) {
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+        responder(stream);
+        println!("Connection established!");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc;
+    use std::io::Write;
 
     #[test]
     fn test_spawn_server() {
-        let listener = spawn_tcp_server();
+        let listener = internal_spawn_tcp_server(0, "127.0.0.1:0");
         assert!(listener.local_addr().is_ok(), "Listener should have a valid local address");
     }
 
@@ -76,5 +96,28 @@ mod tests {
         });
 
         assert!(result.is_err(), "The binding should have paniced, as it cannot bind to the port but it didn't");
+    }
+
+    #[test]
+    fn test_check_if_data_arrives() {
+        let (tx, rx) = mpsc::channel();
+        let listener = internal_spawn_tcp_server(0, "127.0.0.1:0");
+
+        let port = listener.local_addr().expect("Failed to get local address").port();
+        thread::spawn(move || {
+            handle_incoming_connections(listener, &|_stream| {
+                println!("Connection established!");
+                tx.send(true).expect("Failed to send success signal");
+            })
+        });
+
+        let mut stream = TcpStream::connect(("127.0.0.1:".to_owned() + &port.to_string()).as_str()).expect("Failed to create tcp client");
+        let request = "Hello, server!";
+        stream.write_all(request.as_bytes());
+        thread::sleep(Duration::from_secs(5));
+        match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(_) => println!("Test succeeded, connection was established and handled."),
+            Err(e) => panic!("Test failed: {:?}", e),
+        }
     }
 }
