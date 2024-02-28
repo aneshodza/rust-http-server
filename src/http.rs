@@ -5,7 +5,6 @@ mod http_codes;
 
 /// This is the internal request gate, which writes everything but the 400 Bad Request HTTP
 /// Response to the client.
-///
 fn internal_request_gate(stream: &TcpStream) -> Result<(), String> {
     println!("New connection from: {}", stream.peer_addr().unwrap());
     let mut buffer = [0; 1024];

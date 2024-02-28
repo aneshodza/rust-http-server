@@ -2,6 +2,7 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::Duration;
 
+/// This is the amount of reconnects that will be attempted by the TCP Binder before panicing.
 const RECONNECT_TRIES: u8 = 5;
 
 /// Attempts to spawn a TCP-Server to port 7878. It retries 5 times, after which the function

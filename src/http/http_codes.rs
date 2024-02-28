@@ -6,10 +6,17 @@ use std::net::TcpStream;
 mod bad_request;
 mod ok;
 
+/// This function returns a 400 Bad Request response as a byte array.
+///
+/// # Returns
+///
+/// A byte array containing the 400 Bad Request response.
 pub fn bad_request() -> &'static [u8] {
     bad_request::BAD_REQUEST.as_bytes()
 }
 
+/// This function sends a 200 OK response to the client. It does so by sending the header and body
+/// separately.
 pub fn ok(mut stream: &TcpStream, data: String) {
     let mut response = ok::OK.to_string();
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());

@@ -1,3 +1,4 @@
+/// This contains the 400 Bad Request response
 pub const BAD_REQUEST: &str = r#"HTTP/1.1 400 Bad Request
 Server: Anes HTTP
 Content-Type: text/plain
