@@ -1,6 +1,8 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::path::Path;
 
+mod http_object;
 mod http_codes;
 
 /// This is the internal request gate, which writes everything but the 400 Bad Request HTTP
@@ -13,14 +15,26 @@ fn internal_request_gate(stream: &TcpStream) -> Result<(), String> {
     match mutable_stream.read(&mut buffer) {
         Ok(0) => Err("No data received from the client.".to_string()),
         Ok(_) => {
+            println!("Received data: \n{}", String::from_utf8_lossy(&buffer));
             let request = request_tokenizer(&String::from_utf8_lossy(&buffer));
             if !request.is_http() {
                 println!("This is not an http request");
                 return Err("This is not an http request".to_string());
             }
-            http_codes::ok(stream, "Hello, world!".to_string());
-            Some(":)".to_string());
-            Ok(())
+
+            let req_path = request.request_path();
+            let mime = request.accepted_mime_with_weight();
+            let file_result = file_browser(req_path, mime);
+            match file_result {
+                Some(file) => {
+                    http_codes::ok(stream, file);
+                    Ok(())
+                },
+                None => {
+                    println!("Not found");
+                    Ok(())
+                }
+            }
         }
         Err(e) => Err(format!("Failed to receive data: {}", e)),
     }
@@ -47,28 +61,22 @@ pub fn request_gate(mut stream: TcpStream) {
 /// # Returns
 ///
 /// Returns an instance of the HttpResponse struct
-fn request_tokenizer(request: &str) -> HttpRequest {
+fn request_tokenizer(request: &str) -> http_object::HttpObject {
     let lines: Vec<&str> = request.split("\r\n").collect();
-    HttpRequest {
-        request: lines[0].to_string(),
-        // accept: lines[3].to_string(),
-        // accept_encoding: lines[5].to_string(),
-    }
+    // http_object::HttpObject {
+    //     // request: lines[0].to_string(),
+    //     // accept: lines[3].to_string(),
+    //     // accept_encoding: lines[5].to_string(),
+    // }
+    http_object::HttpObject::new(lines[0].to_string(), lines[3].to_string())
 }
 
-/// This struct is used to store the attributes of the incoming http request
-struct HttpRequest {
-    request: String,
-    // accept: String,
-    // accept_encoding: String,
-}
+/// This function searches for a matching file in the file system and returns the file if it
+/// exists
+fn file_browser(filepath: &str, mime: Vec<(String, f32)>) -> Option<String> {
+    let static_dir = Path::new("/static/");
 
-/// This is the implementation of the HttpResponse. It gives the user methods to more easily
-/// interact with the HttpResponse struct by giving helper functions
-impl HttpRequest {
-    fn is_http(&self) -> bool {
-        self.request.split_whitespace().collect::<Vec<&str>>()[2] == "HTTP/1.1"
-    }
+    Some(format!("Hello, world"))
 }
 
 #[cfg(test)]
