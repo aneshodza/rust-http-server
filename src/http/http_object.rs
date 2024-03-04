@@ -27,7 +27,11 @@ impl HttpObject {
     ///
     /// Returns a boolean value that is true if the request is an HTTP request
     pub fn is_http(&self) -> bool {
-        self.request.split_whitespace().collect::<Vec<&str>>()[2] == "HTTP/1.1"
+        let split_request = self.request.split_whitespace().collect::<Vec<&str>>();
+        if split_request.len() != 3 { return false; }
+        if split_request[0] != "GET" { return false; }
+
+        split_request[2] == "HTTP/1.1"
     }
 
     /// This function returns the request path of the incoming HTTP request

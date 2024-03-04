@@ -71,12 +71,20 @@ pub fn request_gate(mut stream: TcpStream) {
 /// Returns an instance of the HttpResponse struct
 fn request_tokenizer(request: &str) -> http_object::HttpObject {
     let lines: Vec<&str> = request.split("\r\n").collect();
-    // http_object::HttpObject {
-    //     // request: lines[0].to_string(),
-    //     // accept: lines[3].to_string(),
-    //     // accept_encoding: lines[5].to_string(),
-    // }
-    http_object::HttpObject::new(lines[0].to_string(), lines[3].to_string())
+
+    let mut request_line = String::new();
+    let mut accept_header = String::new();
+
+    for line in &lines {
+        if line.starts_with("GET") {
+            request_line = line.to_string();
+        } else if line.starts_with("Accept:") || line.starts_with("accept:") {
+            accept_header = line.to_string();
+            break; // Assuming we only need the first Accept header.
+        }
+    }
+
+    http_object::HttpObject::new(request_line, accept_header)
 }
 
 /// This function searches for a matching file in the file system and returns the file if it
@@ -143,7 +151,7 @@ fn parse_filepath(filepath: &str) -> String {
 fn append_to_matching_files(
     matching_files: &mut Vec<(PathBuf, f32)>,
     entry: glob::GlobResult,
-    accepted_mimes: Vec<(String, f32)>
+    accepted_mimes: Vec<(String, f32)>,
 ) {
     match entry {
         Ok(path) => {
@@ -228,12 +236,11 @@ fn correct_mime(mime: Mime, accepted_mimes: Vec<(String, f32)>) -> String {
     let mime_string = mime.to_string();
     for (m, _) in accepted_mimes {
         if m.eq(&mime_string) {
-            return mime_string
+            return mime_string;
         }
     }
     "*/*".to_string()
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -272,7 +279,7 @@ mod tests {
         use std::io::{Read, Write};
         use std::net::TcpStream;
 
-        let address = "127.0.0.1:0"; // Use the actual address and port
+        let address = "127.0.0.1:0";
         let listener = tcp::spawn_tcp_server(address);
         let port = listener.local_addr().unwrap().port();
 
@@ -280,22 +287,19 @@ mod tests {
             tcp::handle_incoming_connections(listener, &request_gate);
         });
 
-        // Connect to the server
         let mut stream = TcpStream::connect(format!("127.0.0.1:{}", port))?;
 
-        // Send non-HTTP data
         stream.write_all(b"NOT HTTP DATA\r\n\r\n")?;
 
-        // Read the response
-        let mut response = String::new();
-        stream.read_to_string(&mut response)?;
+        let mut buffer = Vec::new();
+        stream.read_to_end(&mut buffer)?;
 
-        // Check if the response matches the expected BAD_REQUEST
+        let headers = String::from_utf8_lossy(&buffer);
+
         assert!(
-            response.contains("400 Bad Request"),
+            headers.contains("400 Bad Request"),
             "The response does not contain the expected 400 Bad Request status"
         );
-
         Ok(())
     }
 }

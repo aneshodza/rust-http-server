@@ -12,11 +12,11 @@ mod ok;
 /// `public/400.html`.
 /// If the file is not found, the response is a simple string.
 pub fn bad_request(stream: &TcpStream) {
-    err_handler(stream, "static/400.html", "400 - Bad Request", bad_request::BAD_REQUEST.to_string())
+    err_handler(stream, "/public/400.html", "400 - Bad Request", bad_request::BAD_REQUEST.to_string())
 }
 
 pub fn not_found(stream: &TcpStream) {
-    err_handler(stream, "static/404.html", "404 - Not Found", not_found::NOT_FOUND.to_string())
+    err_handler(stream, "/public/404.html", "404 - Not Found", not_found::NOT_FOUND.to_string())
 
 }
 
@@ -62,6 +62,7 @@ fn err_handler(mut stream: &TcpStream, filename: &'static str, default_html: &'s
     ));
 
     println!("{}", response);
+    println!("{:?}", compressed_data);
 
     let _ = stream.write_all(response.as_bytes());
     let _ = stream.write_all(&compressed_data);
