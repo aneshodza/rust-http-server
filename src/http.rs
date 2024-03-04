@@ -274,6 +274,31 @@ mod tests {
         Ok(())
     }
 
+    #[tokio_test]
+    async fn test_not_found_gives_400() -> Result<(), reqwest::Error> {
+        let listener = tcp::spawn_tcp_server("127.0.0.1:0");
+
+        let _port = listener
+            .local_addr()
+            .expect("Failed to get the local address")
+            .port();
+
+        thread::spawn(move || {
+            tcp::handle_incoming_connections(listener, &request_gate);
+        });
+
+        let client = reqwest::Client::new();
+
+        let res = client
+            .get(format!("http://127.0.0.1:{}/jgerhgirehglrekrgrej", _port.to_string()))
+            .send()
+            .await?;
+
+        assert_eq!(res.status(), reqwest::StatusCode::NOT_FOUND, "The response was not a 404");
+        Ok(())
+    }
+
+
     #[test]
     fn test_malformed_request_triggers_bad_request() -> std::io::Result<()> {
         use std::io::{Read, Write};
