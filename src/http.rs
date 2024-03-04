@@ -1,9 +1,11 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-mod http_object;
+use mime_guess::Mime;
+
 mod http_codes;
+mod http_object;
 
 /// This is the internal request gate, which writes everything but the 400 Bad Request HTTP
 /// Response to the client.
@@ -23,15 +25,21 @@ fn internal_request_gate(stream: &TcpStream) -> Result<(), String> {
             }
 
             let req_path = request.request_path();
-            let mime = request.accepted_mime_with_weight();
-            let file_result = file_browser(req_path, mime);
-            match file_result {
-                Some(file) => {
-                    http_codes::ok(stream, file);
+            let mime = request.weighted_mimes();
+            let fileresult;
+            match mime {
+                Ok(unwrapped_mime) => {
+                    fileresult = file_browser(req_path, unwrapped_mime);
+                }
+                Err(e) => return Err(e),
+            }
+            match fileresult {
+                Some(fileresult) => {
+                    http_codes::ok(stream, fileresult.0, fileresult.1);
                     Ok(())
-                },
+                }
                 None => {
-                    println!("Not found");
+                    http_codes::not_found(stream);
                     Ok(())
                 }
             }
@@ -50,7 +58,7 @@ pub fn request_gate(mut stream: TcpStream) {
         }
         Err(e) => {
             println!("Request handling gave an error: {}", e);
-            let _ = stream.write(http_codes::bad_request());
+            http_codes::bad_request(&stream);
         }
     }
 }
@@ -73,11 +81,159 @@ fn request_tokenizer(request: &str) -> http_object::HttpObject {
 
 /// This function searches for a matching file in the file system and returns the file if it
 /// exists
-fn file_browser(filepath: &str, mime: Vec<(String, f32)>) -> Option<String> {
-    let static_dir = Path::new("/static/");
+fn file_browser(filepath: &str, accepted_mimes: Vec<(String, f32)>) -> Option<(Vec<u8>, String)> {
+    let base_path = "public".to_string();
+    let parsed_filepath = parse_filepath(filepath);
+    let path_pattern = base_path + &parsed_filepath;
+    let mut matching_files: Vec<(PathBuf, f32)> = Vec::new();
 
-    Some(format!("Hello, world"))
+    for entry in glob::glob(&path_pattern).unwrap() {
+        append_to_matching_files(&mut matching_files, entry, accepted_mimes.clone());
+    }
+
+    if matching_files.len() == 0 {
+        return None;
+    }
+
+    let used_file = best_match(matching_files);
+    let used_filepath = used_file.to_str().unwrap().to_string();
+    let used_mime = mime_guess::from_path(used_filepath).first_or_octet_stream();
+    let file_content = std::fs::read(used_file);
+    match file_content {
+        Ok(content) => {
+            return Some((content, correct_mime(used_mime, accepted_mimes)));
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+            return None;
+        }
+    }
 }
+
+/// This function parses the filepath and returns a string that can be used to search for the file in
+/// the file system
+///
+/// # Parameters
+///
+/// - `filepath`: This is the filepath that is to be parsed
+///
+/// # Returns
+///
+/// Returns a `String` that can be used to search for the file in the file system
+fn parse_filepath(filepath: &str) -> String {
+    let mut parsed_filepath = filepath.to_string();
+    // TODO: Check if allowing ../ is a security risk
+    if parsed_filepath == "/" {
+        parsed_filepath = "/index.*".to_string();
+    } else if parsed_filepath.contains('.') {
+        parsed_filepath = format!("/{}", parsed_filepath);
+    } else {
+        parsed_filepath = format!("{}*", parsed_filepath);
+    }
+    parsed_filepath
+}
+
+/// This function appends the matching files to the matching_files vector
+///
+/// # Parameters
+///
+/// - `matching_files`: This is a reference to a vector of tuples that contain the file path and the
+/// - `entry`: This is the result of the glob search
+/// - `accepted_mimes`: This is a vector of tuples that contain the mime type and the weight
+fn append_to_matching_files(
+    matching_files: &mut Vec<(PathBuf, f32)>,
+    entry: glob::GlobResult,
+    accepted_mimes: Vec<(String, f32)>
+) {
+    match entry {
+        Ok(path) => {
+            if let Some(file_extension) = path.extension() {
+                let mime = file_extension.to_str().unwrap_or_default().to_string();
+                let mut weight = default_weight(&accepted_mimes);
+
+                if let Some(w) = find_weight_for_mime(mime, &accepted_mimes) {
+                    weight = w;
+                }
+
+                println!("Serving file: {:?}", path);
+                matching_files.push((path, weight));
+            }
+        }
+        Err(e) => println!("{:?}", e),
+    }
+}
+
+/// This function returns the default weight for the accept attribute
+///
+/// # Parameters
+///
+/// - `mimes`: This is a reference to a vector of tuples that contain the mime type and the weight
+///
+/// # Returns
+///
+/// Returns a `f32` that is the default weight
+fn default_weight(mimes: &Vec<(String, f32)>) -> f32 {
+    for (m, w) in mimes {
+        if m == "*/*" {
+            return w.clone();
+        }
+    }
+    0.0
+}
+
+/// This function finds the weight for a specific mime type
+///
+/// # Parameters
+///
+/// -`extension`: This is the extension of the file
+/// -`mimes`: This is a reference to a vector of tuples that contain the mime type and the weight
+///
+/// # Returns
+///
+/// The function returns an `Option<f32>` that is the weight of the mime type
+fn find_weight_for_mime(extension: String, mimes: &Vec<(String, f32)>) -> Option<f32> {
+    for (m, w) in mimes {
+        let current_extension = m.split("/").collect::<Vec<&str>>()[1];
+        if extension == current_extension {
+            return Some(w.clone());
+        }
+    }
+    None
+}
+
+/// This function returns the best matching file
+///
+/// # Parameters
+///
+/// - `matching_files`: This is a vector of tuples that contain the file path and the weight
+///
+/// # Returns
+///
+/// This function returns a `PathBuf` that is the best matching file
+fn best_match(matching_files: Vec<(PathBuf, f32)>) -> PathBuf {
+    let mut best_match = PathBuf::new();
+    let mut best_weight = -1.0;
+
+    for matching_file in matching_files {
+        if matching_file.1 > best_weight {
+            best_match = matching_file.0.to_path_buf();
+            best_weight = matching_file.1;
+        }
+    }
+
+    best_match.to_path_buf()
+}
+
+fn correct_mime(mime: Mime, accepted_mimes: Vec<(String, f32)>) -> String {
+    let mime_string = mime.to_string();
+    for (m, _) in accepted_mimes {
+        if m.eq(&mime_string) {
+            return mime_string
+        }
+    }
+    "*/*".to_string()
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -106,8 +262,6 @@ mod tests {
             .get(format!("http://127.0.0.1:{}", _port.to_string()))
             .send()
             .await?;
-
-        println!("{:?}", res);
 
         assert!(res.status().is_success(), "The response was not successful");
         Ok(())

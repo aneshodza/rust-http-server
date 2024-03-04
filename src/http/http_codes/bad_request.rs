@@ -1,10 +1,10 @@
 /// This contains the 400 Bad Request response
 pub const BAD_REQUEST: &str = r#"HTTP/1.1 400 Bad Request
 Server: Anes HTTP
-Content-Type: text/plain
+Content-Type: text/html
+Content-Encoding: gzip
 Connection: close
-
-The request could not be understood by the server due to malformed syntax."#;
+"#;
 
 #[cfg(test)]
 mod tests {
