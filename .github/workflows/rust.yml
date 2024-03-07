@@ -1,0 +1,57 @@
+name: Rust
+
+on: [push]
+
+env:
+  CARGO_TERM_COLOR: always
+  TCP_ADDRESS: "127.0.0.1:7878"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: Linux
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: MacOS-ARM
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            name: Windows-x86
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Build
+        run: cargo build --verbose --release --target ${{ matrix.target }}
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Set artifact path
+        id: set-artifact-path
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "i686-pc-windows-msvc" ]; then
+            echo "::set-output name=path::target/${{ matrix.target }}/release/minimal-tictactoe.exe"
+          else
+            echo "::set-output name=path::target/${{ matrix.target }}/release/minimal-tictactoe"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.name }}-artifact
+          path: ${{ steps.set-artifact-path.outputs.path }}
