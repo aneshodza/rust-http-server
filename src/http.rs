@@ -1,6 +1,6 @@
-use std::io::{Read, Write};
+use std::io::Read;
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use mime_guess::Mime;
 
@@ -271,6 +271,12 @@ mod tests {
             .await?;
 
         assert!(res.status().is_success(), "The response was not successful");
+        // Check if the content is "Served HTML content from Anes HTTP!"
+        let content = res.text().await?;
+        assert!(
+            content.contains("Served HTML content from Anes HTTP!"),
+            "The content was not as expected"
+        );
         Ok(())
     }
 
@@ -290,14 +296,20 @@ mod tests {
         let client = reqwest::Client::new();
 
         let res = client
-            .get(format!("http://127.0.0.1:{}/jgerhgirehglrekrgrej", _port.to_string()))
+            .get(format!(
+                "http://127.0.0.1:{}/jgerhgirehglrekrgrej",
+                _port.to_string()
+            ))
             .send()
             .await?;
 
-        assert_eq!(res.status(), reqwest::StatusCode::NOT_FOUND, "The response was not a 404");
+        assert_eq!(
+            res.status(),
+            reqwest::StatusCode::NOT_FOUND,
+            "The response was not a 404"
+        );
         Ok(())
     }
-
 
     #[test]
     fn test_malformed_request_triggers_bad_request() -> std::io::Result<()> {
