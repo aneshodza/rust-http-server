@@ -287,18 +287,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "http-server"
-version = "0.1.0"
-dependencies = [
- "dotenv",
- "flate2",
- "glob",
- "mime_guess",
- "reqwest",
- "tokio",
-]
-
-[[package]]
 name = "httparse"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -663,6 +651,18 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "winreg",
+]
+
+[[package]]
+name = "rust-http-server"
+version = "1.0.0"
+dependencies = [
+ "dotenv",
+ "flate2",
+ "glob",
+ "mime_guess",
+ "reqwest",
+ "tokio",
 ]
 
 [[package]]
