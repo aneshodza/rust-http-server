@@ -45,9 +45,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.target }}" = "i686-pc-windows-msvc" ]; then
-            echo "::set-output name=path::target/${{ matrix.target }}/release/minimal-tictactoe.exe"
+            echo "::set-output name=path::target/${{ matrix.target }}/release/anes-http.exe"
           else
-            echo "::set-output name=path::target/${{ matrix.target }}/release/minimal-tictactoe"
+            echo "::set-output name=path::target/${{ matrix.target }}/release/anes-http"
           fi
 
       - name: Upload build artifact
