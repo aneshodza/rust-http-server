@@ -45,9 +45,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.target }}" = "i686-pc-windows-msvc" ]; then
-            echo "::set-output name=path::target/${{ matrix.target }}/release/anes-http.exe"
+            echo "path=target/${{ matrix.target }}/release/anes-http.exe" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=path::target/${{ matrix.target }}/release/anes-http"
+            echo "path=target/${{ matrix.target }}/release/anes-http" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload build artifact
